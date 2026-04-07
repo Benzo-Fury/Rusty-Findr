@@ -1,0 +1,112 @@
+# Rusty-Findr Configuration
+# This file is created automatically on first run.
+# All paths must be absolute.
+
+[server]
+port = 3030
+# The public URL where Rusty-Findr is accessible (used for auth callbacks)
+base_url = "http://localhost:3030"
+# Origins allowed to make cross-site requests (your frontend URL(s))
+trusted_origins = ["http://localhost:5173"]
+
+[auth]
+# Secret key for signing sessions/tokens (must be at least 32 characters)
+secret = ""
+
+[paths]
+# Directory for job logs
+logs = ""
+# Temporary download directory for torrents - Findr will commonly nuke this folder, don't contain anything important
+download = ""
+# Final destination for movies
+movies = ""
+# Final destination for TV shows
+series = ""
+
+[naming]
+# Templates for media file/folder naming
+# Available placeholders: {title}, {year}, {season}, {episode}
+movie_folder = "{title} ({year})"
+movie_file = "{title} ({year})"
+series_folder = "{title} ({year})"
+season_folder = "Season {season}"
+series_file = "{title} - S{season}E{episode}"
+
+[jobs]
+# Maximum number of jobs processed in parallel
+max_concurrent = 2
+# Maximum retry attempts per job (tries next best torrent on failure)
+max_retries = 3
+# File extensions recognized as media files for sterilization
+media_extensions = ["mkv", "mp4", "avi", "mov", "wmv", "flv", "webm"]
+
+[jobs.stage_weights]
+# How much each stage contributes to overall job progress (should sum to 1.0)
+indexing = 0.05
+downloading = 0.80
+sterilizing = 0.10
+saving = 0.04
+cleanup = 0.01
+
+[jobs.scoring]
+# Dimension weights (higher = more influence on final score)
+resolution_weight = 30.0
+file_size_weight = 25.0
+seeders_weight = 25.0
+codec_weight = 20.0
+release_type_weight = 20.0
+release_group_weight = 5.0
+
+# Preferred resolutions in order of priority (first = best)
+resolutions = ["1080p", "720p", "2160p"]
+
+# Torrents below this seeder count receive a heavy penalty
+min_seeders = 5
+
+# Ideal file size in GB (peak of the gaussian scoring curve)
+ideal_size_gb = 4.0
+
+# 4K torrents above this size (in GB) receive a bloat penalty
+max_4k_size_gb = 20.0
+bloat_penalty = 15.0
+
+# Release types that are filtered out before scoring
+blacklisted_release_types = ["CAM", "TS"]
+
+# Known reputable release groups (receive a bonus)
+reputable_groups = [
+    "SPARKS", "YIFY", "EZTV", "FGT", "PSYCHD", "TERMINAL", "TIGOLE",
+    "QXR", "RARBG", "EVO", "AMIABLE", "GECKOS", "STUTTERSHIT", "NTB",
+    "FLUX", "CMRG", "SMURF", "NOGRP", "MZABI", "ION10", "PAXA",
+    "BAKED", "DRONES", "SHITBOX", "USURY", "RUSTED", "BORDERLINE",
+    "PLAYNOW", "EDITH", "HANDJOB", "SICKRAGE", "MiNX", "DEMAND",
+    "ROVERS", "JOY", "TOPKEK", "D3G", "FUM", "BLOW", "CAKES",
+    "TOMMY", "SURCODE", "TBS", "LAMA", "YTS"
+]
+
+[jobs.downloading]
+# Seconds between each poll to qBittorrent
+poll_interval_secs = 5
+# Minimum number of connected seeders
+min_seeders = 3
+# Seconds below min_seeders before failing
+min_seeders_timeout_secs = 60
+
+[database]
+# PostgreSQL connection URL
+url = "postgres://localhost/rusty-findr"
+
+[qbittorrent]
+url = "http://localhost:8080"
+username = "admin"
+password = "adminadmin"
+
+[jackett]
+# Base URL of your Jackett instance (include port if non-default)
+url = "http://localhost:9117"
+# API key from Jackett's dashboard (Settings > API Key)
+api_key = ""
+
+[tmdb]
+# API key from TMDB (https://www.themoviedb.org/settings/api)
+api_key = ""
