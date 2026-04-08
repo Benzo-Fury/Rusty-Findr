@@ -45,12 +45,9 @@ Pre-compiled binaries are available on the [releases page](../../releases) for m
 |---|---|---|
 | macOS (Apple Silicon) | arm64 | `rusty-findr-aarch64-apple-darwin` |
 | macOS (Intel) | x86_64 | `rusty-findr-x86_64-apple-darwin` |
-| Linux | x86_64 | `rusty-findr-x86_64-unknown-linux-gnu` |
-| Linux (no glibc / Alpine) | x86_64 | `rusty-findr-x86_64-unknown-linux-musl` |
+| Linux | x86_64 | `rusty-findr-x86_64-unknown-linux-musl` |
 | Windows | x86_64 | `rusty-findr-x86_64-pc-windows-msvc.exe` |
 
-> [!NOTE]
-> Not sure which Linux build to use? If you are on a standard distro (Ubuntu, Debian, Fedora, Arch) use the `gnu` build. Use `musl` only if you are on Alpine Linux or a minimal container image.
 
 On macOS and Linux, mark the binary as executable after downloading, then run it.
 
