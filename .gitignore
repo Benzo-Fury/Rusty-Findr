@@ -4,3 +4,4 @@
 Cross.toml
 /docs/Decisions.md
 /docs/Roadmap.md
+.DS_Store
