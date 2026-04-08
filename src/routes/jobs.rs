@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{Extension, Json, Router, extract::Path, http::StatusCode, response::IntoResponse, routing::{delete, get, post}};
+use axum::{Extension, Json, Router, extract::Path, http::StatusCode, response::IntoResponse, routing::{delete, get}};
 use better_auth::{CurrentSession, adapters::SqlxAdapter};
 use serde::Deserialize;
 

@@ -27,10 +27,6 @@ pub enum Stage {
 }
 
 impl Stage {
-    pub fn is_terminal(&self) -> bool {
-        matches!(self, Stage::Finished | Stage::Failed)
-    }
-
     pub fn to_progress_weight(&self, weights: &StageWeightsConfig) -> f32 {
         match self {
             Stage::Indexing => weights.indexing,
@@ -99,36 +95,6 @@ impl Job {
         .await?;
 
         Ok(job)
-    }
-
-    /// Load job from database using ID.
-    pub async fn from_id(id: &str) -> Result<Job, sqlx::Error> {
-        let pool = Job::pool();
-
-        tracing::debug!("Loading job {id}");
-
-        let uuid = uuid::Uuid::parse_str(id).map_err(|e| {
-            tracing::error!("Invalid job ID '{id}': {e}");
-            sqlx::Error::Decode(Box::new(e))
-        })?;
-
-        let row = sqlx::query_as::<_, Job>(concat!(
-            "SELECT id, imdb_id, title, poster_path, season, current_stage, last_log, preferences, progress, user_id, ",
-            ts!("created_at"), " as created_at, ",
-            ts!("updated_at"), " as updated_at ",
-            "FROM jobs WHERE id = $1",
-        ))
-        .bind(uuid)
-        .fetch_one(pool)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to load job {id}: {e}");
-            e
-        })?;
-
-        tracing::debug!("Loaded job {id}");
-
-        Ok(row)
     }
 
     /// Save the current job state back to the database, overwriting all fields.

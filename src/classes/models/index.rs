@@ -74,36 +74,6 @@ impl Index {
         }
     }
 
-    /// Load index and its torrents from database using ID.
-    pub async fn from_id(id: &str) -> Result<Index, sqlx::Error> {
-        let pool = Self::pool();
-
-        let uuid = uuid::Uuid::parse_str(id).map_err(|e| {
-            tracing::error!("Invalid index ID '{id}': {e}");
-            sqlx::Error::Decode(Box::new(e))
-        })?;
-
-        let row = sqlx::query_as::<_, IndexRow>(concat!(
-            "SELECT id, imdb_id, season, selected_torrent, user_id, ",
-            ts!("created_at"), " as created_at ",
-            "FROM indexes WHERE id = $1",
-        ))
-        .bind(uuid)
-        .fetch_one(pool)
-        .await?;
-
-        let torrents = sqlx::query_as::<_, Torrent>(concat!(
-            "SELECT id, index_id, title, magnet_link, size_mb, seeders, leechers, resolution, codec, release_type, tracker_url, score, blacklisted, blacklisted_reason, ",
-            ts!("created_at"), " as created_at ",
-            "FROM torrents WHERE index_id = $1 ORDER BY score DESC",
-        ))
-        .bind(row.id)
-        .fetch_all(pool)
-        .await?;
-
-        Ok(row.into_index(torrents))
-    }
-
     /// Load index and its torrents from database by IMDb ID and season.
     pub async fn from_imdb(imdb_id: &str, season: Option<i32>) -> Result<Index, sqlx::Error> {
         let pool = Self::pool();
