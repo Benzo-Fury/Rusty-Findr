@@ -6,7 +6,6 @@ static INSTANCE: OnceLock<Database> = OnceLock::new();
 
 #[derive(Debug)]
 pub struct Database {
-    pub config: DatabaseConfig,
     pub pool: Pool<Postgres>,
 }
 
@@ -31,7 +30,7 @@ impl Database {
         tracing::info!("Database ready");
 
         INSTANCE
-            .set(Database { config: config.clone(), pool })
+            .set(Database { pool })
             .expect("Database already initialized");
     }
 
