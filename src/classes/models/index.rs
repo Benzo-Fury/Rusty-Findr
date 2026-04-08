@@ -279,6 +279,16 @@ impl Index {
         Ok((indexes, total.0))
     }
 
+    /// Delete an index by ID. Returns true if a row was deleted.
+    pub async fn delete(id: uuid::Uuid) -> Result<bool, sqlx::Error> {
+        let pool = Self::pool();
+        let result = sqlx::query("DELETE FROM indexes WHERE id = $1")
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
     fn pool() -> &'static sqlx::Pool<sqlx::Postgres> {
         &crate::classes::database::Database::get().pool
     }

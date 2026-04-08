@@ -87,3 +87,11 @@ export function fetchDiscoverFeed() {
 export function lookupIndexes(imdbId: string, init?: RequestInit) {
   return fetchJSON<{ indexes: Index[] }>(`/api/indexes/lookup/${imdbId}`, init)
 }
+
+export async function deleteIndex(id: string) {
+  const res = await fetch(`/api/indexes/${id}`, { method: "DELETE" })
+  if (!res.ok && res.status !== 204) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || "Failed to delete index")
+  }
+}

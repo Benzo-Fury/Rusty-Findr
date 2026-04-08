@@ -67,17 +67,18 @@ impl JobHandler {
         logger
     }
 
+    async fn run_stage(&self, stage: Stage) -> JobLogger {
+        self.job.write().await.update_stage(stage).await;
+        self.create_logger(stage).await
+    }
+
     pub async fn start(&self) {
         // Index
         let mut index_result = if matches!(
             self.job.read().await.current_stage,
             Stage::Pending | Stage::Indexing
         ) {
-            // Complete Index stage: -----------------------------------
-
-            self.job.write().await.update_stage(Stage::Indexing).await;
-            let log = self.create_logger(Stage::Indexing).await;
-
+            let log = self.run_stage(Stage::Indexing).await;
             let query_config = QueryConfig {
                 jackett: &self.config.jackett_config,
                 tmdb: &self.config.tmdb_config,
@@ -91,23 +92,17 @@ impl JobHandler {
                 Ok(result) => result,
                 Err(e) => {
                     log.log(&format!("Indexing failed: {e}"), true).await;
-
                     self.fail().await;
-
                     return;
                 }
             }
         } else {
-            // Skip & pull index from db: --------------------------------
-
             let job = self.job.read().await;
             match Index::from_imdb(&job.imdb_id, job.season).await {
                 Ok(result) => result,
                 Err(e) => {
                     tracing::error!("Failed to load index for {}: {e}", job.imdb_id);
-
                     self.fail().await;
-
                     return;
                 }
             }
@@ -118,12 +113,6 @@ impl JobHandler {
         let (job_imdb_id, job_season) = {
             let job = self.job.read().await;
             (job.imdb_id.clone(), job.season)
-        };
-
-        let download_config = DownloadConfig {
-            qbittorrent: &self.config.qbittorrent_config,
-            download_dir: &self.config.paths_config.download,
-            downloading: &self.config.jobs_config.downloading,
         };
 
         for attempt in 0..max_retries {
@@ -141,16 +130,18 @@ impl JobHandler {
             let torrent_title = torrent.title.clone();
 
             let result: Result<(), StageError> = async {
-                self.job.write().await.update_stage(Stage::Downloading).await;
-                let log = self.create_logger(Stage::Downloading).await;
+                let log = self.run_stage(Stage::Downloading).await;
+                let download_config = DownloadConfig {
+                    qbittorrent: &self.config.qbittorrent_config,
+                    download_dir: &self.config.paths_config.download,
+                    downloading: &self.config.jobs_config.downloading,
+                };
                 let content_path = download(&download_config, torrent, &log).await?;
 
-                self.job.write().await.update_stage(Stage::Sterilizing).await;
-                let log = self.create_logger(Stage::Sterilizing).await;
+                let log = self.run_stage(Stage::Sterilizing).await;
                 let output_dir = sterilize(&log, &self.config.paths_config.download, &content_path, &self.config.jobs_config.media_extensions).await?;
 
-                self.job.write().await.update_stage(Stage::Saving).await;
-                let log = self.create_logger(Stage::Saving).await;
+                let log = self.run_stage(Stage::Saving).await;
                 let save_config = SaveConfig {
                     movies_dir: &self.config.paths_config.movies,
                     series_dir: &self.config.paths_config.series,
@@ -161,10 +152,9 @@ impl JobHandler {
                     series_file: &self.config.naming_config.series_file,
                     tmdb_api_key: &self.config.tmdb_config.api_key,
                 };
-                let _save_dir = save(&log, &save_config, &output_dir, &job_imdb_id, job_season).await?;
+                save(&log, &save_config, &output_dir, &job_imdb_id, job_season).await?;
 
-                self.job.write().await.update_stage(Stage::Cleanup).await;
-                let log = self.create_logger(Stage::Cleanup).await;
+                let log = self.run_stage(Stage::Cleanup).await;
                 cleanup(&log, &content_path).await?;
 
                 Ok(())

@@ -1,4 +1,4 @@
-use axum::{Json, Router, extract::Path, http::StatusCode, response::IntoResponse, routing::get};
+use axum::{Json, Router, extract::Path, http::StatusCode, response::IntoResponse, routing::{delete, get}};
 use serde::Deserialize;
 
 use crate::classes::models::index::Index;
@@ -55,8 +55,39 @@ async fn lookup_by_imdb(Path(imdb_id): Path<String>) -> impl IntoResponse {
     }
 }
 
+async fn delete_index(Path(id): Path<String>) -> impl IntoResponse {
+    let uuid = match uuid::Uuid::parse_str(&id) {
+        Ok(u) => u,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Invalid index ID" })),
+            )
+                .into_response();
+        }
+    };
+
+    match Index::delete(uuid).await {
+        Ok(true) => StatusCode::NO_CONTENT.into_response(),
+        Ok(false) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Index not found" })),
+        )
+            .into_response(),
+        Err(e) => {
+            tracing::error!("Failed to delete index {id}: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to delete index" })),
+            )
+                .into_response()
+        }
+    }
+}
+
 pub fn router() -> Router<crate::routes::SharedState> {
     Router::new()
         .route("/api/indexes", get(list_indexes))
         .route("/api/indexes/lookup/{imdb_id}", get(lookup_by_imdb))
+        .route("/api/indexes/{id}", delete(delete_index))
 }
