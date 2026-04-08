@@ -1,10 +1,18 @@
 import { Outlet, NavLink, useLocation } from "react-router-dom"
-import { Search, Menu, X } from "lucide-react"
+import { Search, Menu, X, LogOut } from "lucide-react"
 import { signOut } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { SearchDialog } from "@/components/search-dialog"
 import { TitleDialog } from "@/components/title-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
 import type { PosterItem } from "@/lib/types"
 import * as React from "react"
 
@@ -115,13 +123,26 @@ export function AppLayout({ session }: AppLayoutProps) {
             <Search className="size-4" />
           </Button>
 
-          <button
-            onClick={() => signOut()}
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground transition-opacity hover:opacity-80 lg:size-9 lg:text-sm"
-            title="Sign out"
-          >
-            {initials}
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground transition-opacity hover:opacity-80 lg:size-9 lg:text-sm"
+            >
+              {initials}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuLabel>
+                {session.user.name || session.user.email}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="gap-2 text-destructive data-highlighted:bg-destructive/10 data-highlighted:text-destructive"
+                onClick={() => signOut()}
+              >
+                <LogOut className="size-4" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 

@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, statSync } from 'fs'
 import { lookup } from 'mime-types'
 import type { Plugin } from 'vite'
 
@@ -13,7 +13,7 @@ function serveRootAssets(): Plugin {
     configureServer(server) {
       server.middlewares.use('/web', (req, res, next) => {
         const filePath = path.join(assetsDir, req.url ?? '')
-        if (existsSync(filePath)) {
+        if (existsSync(filePath) && statSync(filePath).isFile()) {
           const mime = lookup(filePath) || 'application/octet-stream'
           res.setHeader('Content-Type', mime)
           res.end(readFileSync(filePath))
