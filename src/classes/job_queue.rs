@@ -50,25 +50,6 @@ impl JobQueue {
         self.sender.send(job).expect("Job queue channel closed");
     }
 
-    pub async fn get_handler(&self, job_id: uuid::Uuid) -> Option<Arc<JobHandler>> {
-        let mut jobs = self.active_jobs.write().await;
-
-        let mut to_keep = Vec::with_capacity(jobs.len());
-        for h in jobs.drain(..) {
-            if !h.job.read().await.current_stage.is_terminal() {
-                to_keep.push(h);
-            }
-        }
-        *jobs = to_keep;
-
-        for h in jobs.iter() {
-            if h.job.read().await.id == job_id {
-                return Some(h.clone());
-            }
-        }
-        None
-    }
-
     fn spawn_worker(&self, mut receiver: mpsc::UnboundedReceiver<Job>, semaphore: Arc<Semaphore>) {
         let active_jobs = self.active_jobs.clone();
         let config = self.handler_config.clone();
