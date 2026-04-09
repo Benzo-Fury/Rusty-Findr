@@ -71,7 +71,7 @@ pub async fn download(
             .ok_or_else(|| StageError::Retryable("Torrent disappeared from qBittorrent".into()))?;
 
         let progress = t.progress.unwrap_or(0.0);
-        let seeders = t.num_complete.unwrap_or(0);
+        let seeders = t.num_seeds.unwrap_or(0);
         let leechers = t.num_leechs.unwrap_or(0);
         let eta = t.eta.unwrap_or(8640000);
 
