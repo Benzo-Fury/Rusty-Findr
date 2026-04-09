@@ -1,0 +1,62 @@
+name: Create Release
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check version bump
+        id: version
+        run: |
+          CURRENT=$(grep '^version' Cargo.toml | head -1 | sed 's/.*= "\(.*\)"/\1/')
+          PREVIOUS=$(git show HEAD~1:Cargo.toml 2>/dev/null | grep '^version' | head -1 | sed 's/.*= "\(.*\)"/\1/' || echo "")
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+          if [ "$CURRENT" != "$PREVIOUS" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract changelog section
+        if: steps.version.outputs.changed == 'true'
+        id: changelog
+        run: |
+          VERSION=${{ steps.version.outputs.current }}
+          if [ -f CHANGELOG.md ]; then
+            NOTES=$(awk "/^## \[$VERSION\]/{found=1; next} /^## \[/{if(found) exit; next} found{print}" CHANGELOG.md)
+            if [ -n "$NOTES" ]; then
+              echo "use_changelog=true" >> $GITHUB_OUTPUT
+              echo "notes<<EOF" >> $GITHUB_OUTPUT
+              echo "$NOTES" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+            else
+              echo "use_changelog=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "use_changelog=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create release with changelog
+        if: steps.version.outputs.changed == 'true' && steps.changelog.outputs.use_changelog == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.current }}
+          body: ${{ steps.changelog.outputs.notes }}
+
+      - name: Create release with auto notes
+        if: steps.version.outputs.changed == 'true' && steps.changelog.outputs.use_changelog != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.current }}
+          generate_release_notes: true
