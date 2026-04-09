@@ -12,11 +12,11 @@ use crate::classes::errors::StageError;
 use crate::classes::models::index::Index;
 use crate::classes::models::job::{Job, Stage};
 use crate::functions::query_jackett::QueryConfig;
+use crate::functions::stages::cleanup::cleanup;
 use crate::functions::stages::download::{DownloadConfig, download};
 use crate::functions::stages::index::{IndexConfig, index};
-use crate::functions::stages::sterilize::sterilize;
 use crate::functions::stages::save::{SaveConfig, save};
-use crate::functions::stages::cleanup::cleanup;
+use crate::functions::stages::sterilize::sterilize;
 
 // The configurations that the job handler requires.
 #[derive(Clone)]
@@ -139,7 +139,13 @@ impl JobHandler {
                 let content_path = download(&download_config, torrent, &log).await?;
 
                 let log = self.run_stage(Stage::Sterilizing).await;
-                let output_dir = sterilize(&log, &self.config.paths_config.download, &content_path, &self.config.jobs_config.media_extensions).await?;
+                let output_dir = sterilize(
+                    &log,
+                    &self.config.paths_config.download,
+                    &content_path,
+                    &self.config.jobs_config.media_extensions,
+                )
+                .await?;
 
                 let log = self.run_stage(Stage::Saving).await;
                 let save_config = SaveConfig {
