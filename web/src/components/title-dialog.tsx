@@ -1,5 +1,5 @@
 import * as React from "react"
-import { X, Download, TriangleAlert, RefreshCw } from "lucide-react"
+import { X, Download, TriangleAlert, RefreshCw, MoreVertical, Trash2 } from "lucide-react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { MediaCard } from "@/components/media-card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -52,7 +52,12 @@ export function TitleDialog({ item, onClose, onItemClick }: TitleDialogProps) {
   const [creating, setCreating] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [season, setSeason] = React.useState(1)
+  const [activeSeason, setActiveSeason] = React.useState<number | null>(null)
+  const [showNotImplemented, setShowNotImplemented] = React.useState(false)
+  const [showMenu, setShowMenu] = React.useState(false)
+  const [deleting, setDeleting] = React.useState(false)
   const contentRef = React.useRef<HTMLDivElement>(null)
+  const menuRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
     setStatus("loading")
@@ -60,6 +65,10 @@ export function TitleDialog({ item, onClose, onItemClick }: TitleDialogProps) {
     setIndexes([])
     setError(null)
     setSeason(1)
+    setActiveSeason(null)
+    setShowNotImplemented(false)
+    setShowMenu(false)
+    setDeleting(false)
     contentRef.current?.scrollTo(0, 0)
 
     const controller = new AbortController()
@@ -86,6 +95,7 @@ export function TitleDialog({ item, onClose, onItemClick }: TitleDialogProps) {
 
         if (result.indexes.length > 0) {
           setIndexes(result.indexes)
+          setActiveSeason(result.indexes[0]?.season ?? null)
           setStatus("indexed")
         } else {
           setStatus("not-indexed")
@@ -98,6 +108,36 @@ export function TitleDialog({ item, onClose, onItemClick }: TitleDialogProps) {
     load()
     return () => controller.abort()
   }, [item.media_type, item.id])
+
+  const isIndexed = status === "indexed"
+  const currentIndex = indexes.find((ix) => ix.season === activeSeason) ?? indexes[0]
+  const torrents = currentIndex?.torrents ?? []
+  const selectedTorrentId = currentIndex?.selected_torrent ?? null
+
+  React.useEffect(() => {
+    if (!showMenu) return
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [showMenu])
+
+  async function handleDeleteIndex() {
+    if (!currentIndex) return
+    setDeleting(true)
+    try {
+      for (const ix of indexes) {
+        await deleteIndex(ix.id)
+      }
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete index")
+      setDeleting(false)
+    }
+  }
 
   async function handleIndex() {
     if (!details) return
@@ -122,6 +162,24 @@ export function TitleDialog({ item, onClose, onItemClick }: TitleDialogProps) {
       setError(e instanceof Error ? e.message : "Failed to create job")
     }
     setCreating(false)
+  }
+
+  async function handleReindex() {
+    if (!currentIndex || !details) return
+    setCreating(true)
+    setError(null)
+    try {
+      const jobTitle = (details.title || details.name || item.title) as string
+      const posterPath = (details.poster_path || item.poster_path || null) as string | null
+      const s = item.media_type === "tv" ? currentIndex.season ?? undefined : undefined
+      await deleteIndex(currentIndex.id)
+      await createJob(currentIndex.imdb_id, jobTitle, posterPath, s)
+      onClose()
+      navigate("/jobs")
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to re-index")
+      setCreating(false)
+    }
   }
 
   const title = (details?.title || details?.name || item.title) as string
@@ -202,13 +260,6 @@ export function TitleDialog({ item, onClose, onItemClick }: TitleDialogProps) {
         <div ref={contentRef} className="overflow-y-auto max-h-[90vh]">
           {status === "loading" ? (
             <DialogSkeleton onClose={onClose} />
-          ) : status === "indexed" ? (
-            <IndexedContent
-              item={item}
-              details={details!}
-              indexes={indexes}
-              onClose={onClose}
-            />
           ) : (
             <>
               <div className="relative aspect-video w-full bg-muted">
@@ -224,10 +275,33 @@ export function TitleDialog({ item, onClose, onItemClick }: TitleDialogProps) {
 
                 <button
                   onClick={onClose}
-                  className="absolute top-3 right-3 flex size-9 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+                  className="absolute top-3 left-3 flex size-9 items-center justify-center rounded-full bg-black/60 text-white transition-all duration-200 hover:bg-black/80 hover:scale-110 active:scale-95"
                 >
                   <X className="size-5" />
                 </button>
+
+                {isIndexed && (
+                  <div ref={menuRef} className="absolute top-3 right-3">
+                    <button
+                      onClick={() => setShowMenu((v) => !v)}
+                      className="flex size-9 items-center justify-center rounded-full bg-black/60 text-white transition-all duration-200 hover:bg-black/80 hover:scale-110 active:scale-95"
+                    >
+                      <MoreVertical className="size-5" />
+                    </button>
+                    {showMenu && (
+                      <div className="absolute right-0 mt-1 w-44 rounded-lg bg-popover p-1 shadow-xl ring-1 ring-border animate-in fade-in-0 zoom-in-95">
+                        <button
+                          onClick={handleDeleteIndex}
+                          disabled={deleting}
+                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+                        >
+                          <Trash2 className="size-4" />
+                          {deleting ? "Deleting..." : "Delete Index"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="absolute inset-x-0 bottom-0 flex items-end gap-5 p-6">
                   {item.poster_path && (
@@ -239,6 +313,13 @@ export function TitleDialog({ item, onClose, onItemClick }: TitleDialogProps) {
                   )}
 
                   <div className="min-w-0 flex-1">
+                    {isIndexed && (
+                      <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/90 px-3 py-1 text-xs font-semibold text-white shadow-lg backdrop-blur-sm">
+                        <span className="size-1.5 rounded-full bg-white animate-pulse" />
+                        Indexed
+                      </span>
+                    )}
+
                     <h1 className="text-2xl font-bold text-foreground sm:text-3xl lg:text-4xl">
                       {title}
                     </h1>
@@ -248,16 +329,28 @@ export function TitleDialog({ item, onClose, onItemClick }: TitleDialogProps) {
                     )}
 
                     <div className="mt-4 flex flex-wrap items-center gap-3">
-                      <Button
-                        onClick={handleIndex}
-                        disabled={creating}
-                        className="gap-2"
-                      >
-                        <Download className="size-4" />
-                        {creating ? "Creating..." : "Index"}
-                      </Button>
+                      {isIndexed ? (
+                        <Button
+                          onClick={handleReindex}
+                          disabled={creating}
+                          variant="outline"
+                          className="gap-2"
+                        >
+                          <RefreshCw className={cn("size-4", creating && "animate-spin")} />
+                          {creating ? "Re-indexing..." : "Re-Index"}
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handleIndex}
+                          disabled={creating}
+                          className="gap-2"
+                        >
+                          <Download className="size-4" />
+                          {creating ? "Creating..." : "Index"}
+                        </Button>
+                      )}
 
-                      {item.media_type === "tv" && numberOfSeasons > 0 && (
+                      {!isIndexed && item.media_type === "tv" && numberOfSeasons > 0 && (
                         <select
                           value={season}
                           onChange={(e) => setSeason(Number(e.target.value))}
@@ -265,6 +358,23 @@ export function TitleDialog({ item, onClose, onItemClick }: TitleDialogProps) {
                         >
                           {Array.from({ length: numberOfSeasons }, (_, i) => i + 1).map((s) => (
                             <option key={s} value={s}>Season {s}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      {isIndexed && indexes.length > 1 && (
+                        <select
+                          value={activeSeason ?? ""}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setActiveSeason(val === "" ? null : Number(val))
+                          }}
+                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                        >
+                          {indexes.map((ix) => (
+                            <option key={ix.id} value={ix.season ?? ""}>
+                              {ix.season === null ? "Movie" : `Season ${ix.season}`}
+                            </option>
                           ))}
                         </select>
                       )}
@@ -351,6 +461,31 @@ export function TitleDialog({ item, onClose, onItemClick }: TitleDialogProps) {
                   </div>
                 )}
 
+                {isIndexed && (
+                  <div className="mt-6">
+                    <h3 className="mb-3 text-lg font-semibold">
+                      Torrents{" "}
+                      {torrents.length > 0 && (
+                        <span className="font-normal text-sm text-muted-foreground">({torrents.length})</span>
+                      )}
+                    </h3>
+                    {torrents.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No torrents stored for this index.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {torrents.map((torrent) => (
+                          <TorrentRow
+                            key={torrent.id}
+                            torrent={torrent}
+                            isSelected={torrent.id === selectedTorrentId}
+                            onClick={() => setShowNotImplemented(true)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {recommendations.length > 0 && (
                   <div className="mt-6">
                     <h3 className="mb-3 text-lg font-semibold">More Like This</h3>
@@ -371,6 +506,27 @@ export function TitleDialog({ item, onClose, onItemClick }: TitleDialogProps) {
                   </div>
                 )}
               </div>
+
+              {showNotImplemented && (
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                  onClick={() => setShowNotImplemented(false)}
+                >
+                  <div className="absolute inset-0 bg-black/40" />
+                  <div
+                    className="relative w-full max-w-sm rounded-xl bg-background p-6 shadow-xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h2 className="text-base font-semibold">Not Yet Implemented</h2>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Torrent selection is planned and not yet implemented.
+                    </p>
+                    <Button className="mt-4 w-full" onClick={() => setShowNotImplemented(false)}>
+                      OK
+                    </Button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -386,7 +542,7 @@ function DialogSkeleton({ onClose }: { onClose: () => void }) {
         <Skeleton className="size-full rounded-none" />
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 flex size-9 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+          className="absolute top-3 left-3 flex size-9 items-center justify-center rounded-full bg-black/60 text-white transition-all duration-200 hover:bg-black/80 hover:scale-110 active:scale-95"
         >
           <X className="size-5" />
         </button>
@@ -428,193 +584,6 @@ function DialogSkeleton({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       </div>
-    </>
-  )
-}
-
-function IndexedContent({
-  item,
-  details,
-  indexes,
-  onClose,
-}: {
-  item: PosterItem
-  details: Record<string, unknown>
-  indexes: Index[]
-  onClose: () => void
-}) {
-  const navigate = useNavigate()
-  const [activeSeason, setActiveSeason] = React.useState<number | null>(indexes[0]?.season ?? null)
-  const [showNotImplemented, setShowNotImplemented] = React.useState(false)
-  const [reindexing, setReindexing] = React.useState(false)
-  const [reindexError, setReindexError] = React.useState<string | null>(null)
-
-  const currentIndex = indexes.find((ix) => ix.season === activeSeason) ?? indexes[0]
-
-  const title = (details.title || details.name || item.title) as string
-  const backdropPath = details.backdrop_path as string | undefined
-  const tagline = details.tagline as string | undefined
-  const releaseDate = (details.release_date || details.first_air_date || "") as string
-  const genres = (details.genres || []) as { id: number; name: string }[]
-  const voteAverage = (details.vote_average || item.vote_average) as number
-
-  async function handleReindex() {
-    if (!currentIndex) return
-    setReindexing(true)
-    setReindexError(null)
-    try {
-      await deleteIndex(currentIndex.id)
-      const posterPath = (details.poster_path || item.poster_path || null) as string | null
-      const season = item.media_type === "tv" ? currentIndex.season ?? undefined : undefined
-      await createJob(currentIndex.imdb_id, title, posterPath, season)
-      onClose()
-      navigate("/jobs")
-    } catch (e) {
-      setReindexError(e instanceof Error ? e.message : "Failed to re-index")
-      setReindexing(false)
-    }
-  }
-
-  const torrents = currentIndex?.torrents ?? []
-  const selectedId = currentIndex?.selected_torrent ?? null
-
-  return (
-    <>
-      <div className="relative aspect-video w-full bg-muted">
-        {backdropPath ? (
-          <img
-            src={`${BACKDROP_BASE}${backdropPath}`}
-            alt={title}
-            className="size-full object-cover"
-          />
-        ) : null}
-
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
-
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 flex size-9 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
-        >
-          <X className="size-5" />
-        </button>
-
-        <div className="absolute inset-x-0 bottom-0 flex items-end gap-5 p-6">
-          {item.poster_path && (
-            <img
-              src={`${POSTER_BASE}${item.poster_path}`}
-              alt={title}
-              className="hidden w-28 flex-shrink-0 rounded-lg border border-white/10 shadow-xl sm:block md:w-32"
-            />
-          )}
-
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold text-foreground sm:text-3xl lg:text-4xl">
-              {title}
-            </h1>
-
-            {tagline && (
-              <p className="mt-1 text-sm italic text-muted-foreground">{tagline}</p>
-            )}
-
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Button
-                onClick={handleReindex}
-                disabled={reindexing}
-                variant="outline"
-                className="gap-2"
-              >
-                <RefreshCw className={cn("size-4", reindexing && "animate-spin")} />
-                {reindexing ? "Re-indexing..." : "Re-Index"}
-              </Button>
-
-              {indexes.length > 1 && (
-                <select
-                  value={activeSeason ?? ""}
-                  onChange={(e) => {
-                    const val = e.target.value
-                    setActiveSeason(val === "" ? null : Number(val))
-                  }}
-                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                >
-                  {indexes.map((ix) => (
-                    <option key={ix.id} value={ix.season ?? ""}>
-                      {ix.season === null ? "Movie" : `Season ${ix.season}`}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {reindexError && (
-              <p className="mt-2 text-sm text-red-400">{reindexError}</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="p-6 space-y-5">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          {releaseDate && (
-            <span className="font-medium text-foreground">{releaseDate.slice(0, 4)}</span>
-          )}
-          <Badge variant="secondary" className="border-green-200 bg-green-50 text-green-700">
-            Indexed
-          </Badge>
-          {voteAverage > 0 && (
-            <span className="flex items-center gap-1">
-              <span className="text-amber-400">&#9733;</span>
-              {voteAverage.toFixed(1)}
-            </span>
-          )}
-          {genres.slice(0, 3).map((g) => (
-            <Badge key={g.id} variant="secondary">{g.name}</Badge>
-          ))}
-        </div>
-
-        <div>
-          <h3 className="mb-3 text-base font-semibold">
-            Torrents{" "}
-            {torrents.length > 0 && (
-              <span className="font-normal text-sm text-muted-foreground">({torrents.length})</span>
-            )}
-          </h3>
-          {torrents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No torrents stored for this index.</p>
-          ) : (
-            <div className="space-y-2">
-              {torrents.map((torrent) => (
-                <TorrentRow
-                  key={torrent.id}
-                  torrent={torrent}
-                  isSelected={torrent.id === selectedId}
-                  onClick={() => setShowNotImplemented(true)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {showNotImplemented && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowNotImplemented(false)}
-        >
-          <div className="absolute inset-0 bg-black/40" />
-          <div
-            className="relative w-full max-w-sm rounded-xl border bg-background p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-base font-semibold">Not Yet Implemented</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Torrent selection is planned and not yet implemented.
-            </p>
-            <Button className="mt-4 w-full" onClick={() => setShowNotImplemented(false)}>
-              OK
-            </Button>
-          </div>
-        </div>
-      )}
     </>
   )
 }

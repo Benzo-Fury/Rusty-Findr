@@ -38,7 +38,7 @@ export function DialogContent({ className, children, ...props }: DialogContentPr
   return (
     <div
       className={cn(
-        "relative z-50 w-full max-w-lg rounded-xl border bg-background p-6 shadow-2xl animate-in fade-in-0 zoom-in-95",
+        "relative z-50 w-full max-w-lg rounded-xl bg-background p-6 shadow-2xl animate-in fade-in-0 zoom-in-95",
         className,
       )}
       onClick={(e) => e.stopPropagation()}
